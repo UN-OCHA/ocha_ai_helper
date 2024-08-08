@@ -1,0 +1,26 @@
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY:-proxy}
+    external: TRUE
+
+services:
+  ocha_ai_helper:
+    build: .
+    hostname: ${PROJECT_NAME}
+    container_name: ${PROJECT_NAME}
+    environment:
+      VIRTUAL_HOST: ${PROJECT_NAME}.test
+      VIRTUAL_PORT: 80
+      VIRTUAL_NETWORK: ${PROXY:-proxy}
+      HTTPS_METHOD: noredirect
+    volumes:
+      - "./app.py:/srv/www/html/app.py"
+    labels:
+      caddy: ${PROJECT_NAME}.test
+      caddy.reverse_proxy: "{{upstreams}}"
+    expose:
+      - "80"
+    networks:
+      proxy:
