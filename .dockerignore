@@ -1,4 +1,4 @@
-.dockerignore
-docker-compose.yml
-Dockerfile
-README.md
+# Ignore everything except for the files necessary to build the codebase.
+*
+!docker
+!html
