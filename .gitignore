@@ -1,1 +1,8 @@
-.env
+# Ignore local settings.
+/local/.env
+
+# Docker image build log
+buildlog.txt
+
+# Python cache.
+/html/__pycache__

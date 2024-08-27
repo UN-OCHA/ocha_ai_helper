@@ -1,0 +1,6 @@
+fastapi~=0.112
+flashrank~=0.2
+pydantic~=2.8
+pylint~=3.2
+spacy==3.7.5
+uvicorn~=0.30
