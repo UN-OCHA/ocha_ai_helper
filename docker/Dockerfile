@@ -38,7 +38,7 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
 # Download space models.
-RUN mkdir -p /opt/models && \
+RUN mkdir -p /var/log/uvicorn /opt/models  && \
   python3 -m spacy download en_core_web_sm && \
   python3 -m spacy download es_core_news_sm && \
   python3 -m spacy download fr_core_news_sm

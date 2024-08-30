@@ -1,0 +1,38 @@
+version: 1
+disable_existing_loggers: False
+formatters:
+  default:
+    "()": uvicorn.logging.DefaultFormatter
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  access:
+    "()": uvicorn.logging.AccessFormatter
+    format: "[%(asctime)s %(process)d:%(threadName)s] %(name)s - %(levelname)s - %(message)s | %(filename)s:%(lineno)d"
+
+handlers:
+  default:
+    class: logging.FileHandler
+    level: INFO
+    formatter: default
+    filename: /var/log/uvicorn/uvicorn.log
+    encoding: utf8
+    mode: a
+
+  access:
+    formatter: access
+    class: logging.FileHandler
+    level: INFO
+    formatter: default
+    filename: /var/log/uvicorn/access.log
+    encoding: utf8
+    mode: a
+
+loggers:
+  uvicorn.error:
+    level: INFO
+    handlers: [default]
+    propagate: no
+
+  uvicorn.access:
+    level: INFO
+    handlers: [access]
+    propagate: no
