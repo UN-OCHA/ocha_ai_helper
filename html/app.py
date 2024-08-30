@@ -121,6 +121,16 @@ class Response(BaseModel):
 
 #------------------------------------------------------------------------------#
 
+# Health check endpoint.
+@app.get('/status', status_code=200)
+def health_status():
+    """
+    A very simple health check endpoint.
+    """
+    return {"status": "ok"}
+
+#------------------------------------------------------------------------------#
+
 class TextSplitRequest(Request):
     """
     A text splitting request.
