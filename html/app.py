@@ -121,13 +121,25 @@ class Response(BaseModel):
 
 #------------------------------------------------------------------------------#
 
+class HealthCheckResponse(BaseModel):
+    """
+    Health check response.
+
+    Attributes:
+        status (str): the health status of the app, defaults to "ok".
+    """
+    status: str
+
 # Health check endpoint.
 @app.get('/status', status_code=200)
-def health_status():
+def health_status() -> HealthCheckResponse:
     """
     A very simple health check endpoint.
+
+    Returns:
+        HealthCheckResponse: the health check response.
     """
-    return {"status": "ok"}
+    return HealthCheckResponse(status="ok")
 
 #------------------------------------------------------------------------------#
 
