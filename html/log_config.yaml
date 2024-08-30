@@ -7,7 +7,7 @@ formatters:
   access:
     "()": uvicorn.logging.AccessFormatter
     format: "[%(asctime)s %(process)d:%(threadName)s] %(name)s - %(levelname)s - %(message)s | %(filename)s:%(lineno)d"
-    
+
 handlers:
   default:
     class: logging.FileHandler
@@ -25,9 +25,14 @@ handlers:
     filename: /var/log/uvicorn/access.log
     encoding: utf8
     mode: a
-    
+
 loggers:
   uvicorn.error:
     level: INFO
     handlers: [default]
+    propagate: no
+
+  uvicorn.access:
+    level: INFO
+    handlers: [access]
     propagate: no
