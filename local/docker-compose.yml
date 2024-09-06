@@ -16,7 +16,7 @@ services:
     environment:
       ENVIRONMENT:
       VIRTUAL_HOST: ${SITE_DOMAIN}
-      VIRTUAL_PORT: 80
+      VIRTUAL_PORT: 8000
       VIRTUAL_NETWORK: ${PROXY:-proxy}
       HTTPS_METHOD: noredirect
     volumes:
@@ -26,6 +26,6 @@ services:
       caddy: ${SITE_DOMAIN}
       caddy.reverse_proxy: "{{upstreams}}"
     expose:
-      - "80"
+      - "8000"
     networks:
       proxy:
