@@ -396,7 +396,7 @@ def text_match(request: TextMatchLinesRequest) -> TextMatchLinesResponse:
         raise HTTPException(status_code=400, detail='Missing lines')
     if not 0 <= request.threshold <= 100:
         raise HTTPException(status_code=400, detail='Threshold must be between 0 and 100')
-    
+
     # Find matching lines
     matched_lines = []
     for line in request.lines:
@@ -404,13 +404,13 @@ def text_match(request: TextMatchLinesRequest) -> TextMatchLinesResponse:
             # Try different fuzzy matching methods for better results
             partial_score = fuzz.partial_ratio(line.strip(), request.text)
             token_set_score = fuzz.token_set_ratio(line.strip(), request.text)
-            
+
             # Use the best score from the different methods
             best_score = max(partial_score, token_set_score)
-            
+
             if best_score >= request.threshold:
                 matched_lines.append(line.strip())
-    
+
     # Remove duplicates while preserving order
     seen = set()
     unique_matches = []
