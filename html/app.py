@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from flashrank import Ranker, RerankRequest
 from pydantic import BaseModel
 import spacy
+from rapidfuzz import fuzz
 
 # Load and set up the NLP language models.
 nlp_pipeline_exclude = ['tok2vec', 'tagger', 'parser', 'attribute_ruler', 'lemmatizer', 'ner']
@@ -349,3 +350,73 @@ def text_correlate_texts(request: TextCorrelateTextsRequest) -> TextCorrelateTex
     texts = rank_texts(request.text, request.texts, request.language, request.limit)
 
     return TextCorrelateTextsResponse(texts=texts, took=took(start_time))
+
+#------------------------------------------------------------------------------#
+
+class TextMatchLinesRequest(Request):
+    """
+    A request to find lines that match against a given text.
+
+    Attributes:
+        text (str): The text to search for matches against
+        lines (List[str]): The list of lines to search through
+        threshold (int): Minimum similarity score (0-100) to consider a match
+    """
+    text: str
+    lines: List[str]
+    threshold: int = 70
+
+class TextMatchLinesResponse(Response):
+    """
+    A response containing the lines that match against the given text.
+
+    Attributes:
+        lines (List[str]): List of matched lines in original order
+    """
+    lines: List[str]
+
+# Endpoint to match lines against a text
+@app.post('/text/match/lines')
+def text_match(request: TextMatchLinesRequest) -> TextMatchLinesResponse:
+    """
+    API endpoint callback to find matching lines against a text.
+
+    Args:
+        request (TextMatchLinesRequest): The text matching request.
+
+    Returns:
+        TextMatchLinesResponse: The text matching response containing matched lines.
+    """
+    start_time = time.perf_counter()
+
+    # Validate request
+    if not request.text:
+        raise HTTPException(status_code=400, detail='Missing text')
+    if not request.lines:
+        raise HTTPException(status_code=400, detail='Missing lines')
+    if not 0 <= request.threshold <= 100:
+        raise HTTPException(status_code=400, detail='Threshold must be between 0 and 100')
+    
+    # Find matching lines
+    matched_lines = []
+    for line in request.lines:
+        if line.strip():  # Skip empty lines
+            # Try different fuzzy matching methods for better results
+            partial_score = fuzz.partial_ratio(line.strip(), request.text)
+            token_set_score = fuzz.token_set_ratio(line.strip(), request.text)
+            
+            # Use the best score from the different methods
+            best_score = max(partial_score, token_set_score)
+            
+            if best_score >= request.threshold:
+                matched_lines.append(line.strip())
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_matches = []
+    for line in matched_lines:
+        if line not in seen:
+            unique_matches.append(line)
+            seen.add(line)
+
+    return TextMatchLinesResponse(lines=unique_matches, took=took(start_time))
