@@ -3,5 +3,5 @@ flashrank~=0.2
 pydantic~=2.12
 pylint~=3.3
 rapidfuzz~=3.13
-spacy==3.7.5
+spacy~=3.8
 uvicorn~=0.39
