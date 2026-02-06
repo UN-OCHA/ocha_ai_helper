@@ -1,5 +1,5 @@
 # Build the code.
-FROM python:3.14 AS builder
+FROM python:3.12 AS builder
 
 ENV S6VERSION=2.2.0.3
 
@@ -18,7 +18,7 @@ RUN pip install --root-user-action=ignore --upgrade pip setuptools wheel && \
     /opt/venv/bin/pip install -r /srv/www/html/requirements.txt
 
 # Generate the image.
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 ARG VCS_REF
 ARG VCS_URL
