@@ -1,5 +1,5 @@
 # Build the code.
-FROM python:3.12 AS builder
+FROM python:3.13 AS builder
 
 ENV S6VERSION=2.2.0.3
 
@@ -18,7 +18,7 @@ RUN pip install --root-user-action=ignore --upgrade pip setuptools wheel && \
     /opt/venv/bin/pip install -r /srv/www/html/requirements.txt
 
 # Generate the image.
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 ARG VCS_REF
 ARG VCS_URL
@@ -51,7 +51,7 @@ ENV PATH=/opt/venv/bin:$PATH
 RUN \
     apt-get clean && apt-get update && apt-get -y install netcat-openbsd procps && \
     tar xzf /tmp/s6-overlay.tar.gz -C / && \
-    rm -f tar xzf /tmp/s6-overlay.tar.gz && \
+    rm -f /tmp/s6-overlay.tar.gz && \
     # Add some users.
     addgroup --system --gid 4000 appuser && \
     adduser --system --uid 4000 --gid 4000 --shell /sbin/nologin --comment 'Docker App User' --home /home/appuser --no-create-home appuser && \
