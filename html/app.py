@@ -230,9 +230,9 @@ def text_tokenize_text(request: TextTokenizeTextRequest) -> TextTokenizeSentence
     # Process the text.
     document = nlp_models[request.language](request.text)
 
-    # Retrieve the tokens and ensure uniqueness.
+    # Retrieve the tokens and ensure uniqueness (order preserved).
     tokens = [token.text.strip().lower() for token in document if not token.is_space]
-    tokens = list(set(tokens))
+    tokens = list(dict.fromkeys(tokens))
 
     return TextTokenizeSentencesResponse(tokens=tokens, took=took(start_time))
 
