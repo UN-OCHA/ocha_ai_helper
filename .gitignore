@@ -6,3 +6,4 @@ buildlog.txt
 
 # Python cache.
 /html/__pycache__
+/tests/__pycache__
