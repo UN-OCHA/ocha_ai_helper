@@ -198,6 +198,149 @@ def test_text_correlate_texts_missing_texts(client):
 
 
 # -----------------------------------------------------------------------------
+# Text deduplicate texts
+# -----------------------------------------------------------------------------
+
+
+def test_text_deduplicate_texts_success(client):
+    """POST /text/deduplicate/texts returns index-aligned similarity scores."""
+    texts = [
+        "Green tea may improve health.",
+        "Basketball is a popular sport.",
+    ]
+    payload = {
+        "language": "en",
+        "text": "Green tea has health benefits.",
+        "texts": texts,
+    }
+    response = client.post("/text/deduplicate/texts", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "scores" in data
+    assert "took" in data
+    assert isinstance(data["scores"], list)
+    # One score per candidate text, in the same order.
+    assert len(data["scores"]) == len(texts)
+    assert all(isinstance(v, float) for v in data["scores"])
+    # First candidate (tea-related) is more similar than the second (sport).
+    assert data["scores"][0] > data["scores"][1]
+
+
+def test_text_deduplicate_texts_missing_text(client):
+    """POST /text/deduplicate/texts with empty text returns 400."""
+    payload = {"language": "en", "text": "", "texts": ["Doc."]}
+    response = client.post("/text/deduplicate/texts", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing text"
+
+
+def test_text_deduplicate_texts_missing_texts(client):
+    """POST /text/deduplicate/texts with empty texts returns 400."""
+    payload = {"language": "en", "text": "Query.", "texts": []}
+    response = client.post("/text/deduplicate/texts", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing texts"
+
+
+# -----------------------------------------------------------------------------
+# Text deduplicate embed
+# -----------------------------------------------------------------------------
+
+
+def test_text_deduplicate_embed_success(client):
+    """POST /text/deduplicate/embed returns index-aligned embedding vectors."""
+    texts = [
+        "Green tea may improve health.",
+        "Basketball is a popular sport.",
+    ]
+    payload = {"language": "en", "texts": texts}
+    response = client.post("/text/deduplicate/embed", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "embeddings" in data
+    assert "took" in data
+    assert isinstance(data["embeddings"], list)
+    assert len(data["embeddings"]) == len(texts)
+    assert all(isinstance(vec, list) for vec in data["embeddings"])
+    assert all(isinstance(v, float) for vec in data["embeddings"] for v in vec)
+    assert all(len(vec) > 0 for vec in data["embeddings"])
+
+
+def test_text_deduplicate_embed_missing_texts(client):
+    """POST /text/deduplicate/embed with empty texts returns 400."""
+    payload = {"language": "en", "texts": []}
+    response = client.post("/text/deduplicate/embed", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing texts"
+
+
+# -----------------------------------------------------------------------------
+# Text deduplicate embeddings
+# -----------------------------------------------------------------------------
+
+
+def test_text_deduplicate_embeddings_success(client):
+    """POST /text/deduplicate/embeddings returns index-aligned similarity scores."""
+    # Vectors match the conftest mock layout: query ~ first candidate, orthogonal to second.
+    payload = {
+        "language": "en",
+        "embedding": [1.0, 0.0, 0.0, 0.0],
+        "embeddings": [
+            [0.9, 0.1, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+        ],
+    }
+    response = client.post("/text/deduplicate/embeddings", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "scores" in data
+    assert "took" in data
+    assert isinstance(data["scores"], list)
+    assert len(data["scores"]) == 2
+    assert all(isinstance(v, float) for v in data["scores"])
+    assert data["scores"][0] > data["scores"][1]
+
+
+def test_text_deduplicate_embeddings_missing_embedding(client):
+    """POST /text/deduplicate/embeddings with empty embedding returns 400."""
+    payload = {
+        "language": "en",
+        "embedding": [],
+        "embeddings": [[1.0, 0.0]],
+    }
+    response = client.post("/text/deduplicate/embeddings", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing embedding"
+
+
+def test_text_deduplicate_embeddings_missing_embeddings(client):
+    """POST /text/deduplicate/embeddings with empty embeddings returns 400."""
+    payload = {
+        "language": "en",
+        "embedding": [1.0, 0.0],
+        "embeddings": [],
+    }
+    response = client.post("/text/deduplicate/embeddings", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing embeddings"
+
+
+def test_text_deduplicate_embeddings_dimension_mismatch(client):
+    """POST /text/deduplicate/embeddings with mismatched dims returns 400."""
+    payload = {
+        "language": "en",
+        "embedding": [1.0, 0.0, 0.0, 0.0],
+        "embeddings": [
+            [0.9, 0.1, 0.0, 0.0],
+            [0.0, 1.0],
+        ],
+    }
+    response = client.post("/text/deduplicate/embeddings", json=payload)
+    assert response.status_code == 400
+    assert "dimension mismatch" in response.json()["detail"].lower()
+
+
+# -----------------------------------------------------------------------------
 # Text match lines
 # -----------------------------------------------------------------------------
 
