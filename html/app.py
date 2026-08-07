@@ -8,6 +8,8 @@ from typing import Dict, List
 from collections import OrderedDict
 from fastapi import FastAPI, HTTPException
 from flashrank import Ranker, RerankRequest
+from model2vec import StaticModel
+import numpy as np
 from pydantic import BaseModel
 import spacy
 from rapidfuzz import fuzz
@@ -30,6 +32,9 @@ rankers = {
     'es': multilingual_reranker,
     'fr': multilingual_reranker,
 }
+
+# Deduplication model: multilingual static embeddings, CPU-friendly.
+dedup_model = StaticModel.from_pretrained('/opt/model2vec/potion-multilingual-128M')
 
 #------------------------------------------------------------------------------#
 
@@ -96,6 +101,60 @@ def rank_texts(query: str, texts: List[str], language: str, limit: int) -> Dict[
     ranked_texts = {result.get('text'): result.get('score') for result in results[:limit]}
 
     return ranked_texts
+
+# Encode texts into embeddings for deduplication.
+def encode_texts(texts: List[str]) -> np.ndarray:
+    """
+    Encode texts into embeddings using the deduplication model.
+
+    Args:
+        texts (List[str]): the texts to encode.
+
+    Returns:
+        np.ndarray: embedding matrix with one row per text.
+    """
+    # max_length=None disables truncation so full-length texts are embedded.
+    return dedup_model.encode(texts, max_length=None)
+
+# Score candidate embeddings against a query embedding via cosine similarity.
+def score_embeddings(query_vec, candidate_vecs) -> List[float]:
+    """
+    Score candidate embeddings for similarity to a query embedding.
+
+    Args:
+        query_vec: the query embedding vector.
+        candidate_vecs: the candidate embedding vectors.
+
+    Returns:
+        List[float]: cosine similarity scores, one per candidate, in input order.
+    """
+    query_arr = np.asarray(query_vec, dtype=np.float32)
+    candidate_arr = np.asarray(candidate_vecs, dtype=np.float32)
+
+    # Cosine similarity: dot product of unit-normalised vectors.
+    query_norm = query_arr / (np.linalg.norm(query_arr) + 1e-10)
+    scores = []
+    for vec in candidate_arr:
+        vec_norm = vec / (np.linalg.norm(vec) + 1e-10)
+        scores.append(float(np.dot(query_norm, vec_norm)))
+
+    return scores
+
+# Score candidate texts for similarity to a source text using cosine similarity.
+def deduplicate_texts(query: str, texts: List[str]) -> List[float]:
+    """
+    Score candidate texts for similarity to a source text.
+
+    Args:
+        query (str): the source text to compare candidates against.
+        texts (List[str]): the candidate texts (potential duplicates).
+
+    Returns:
+        List[float]: cosine similarity scores, one per candidate text, in the
+            same order as the input texts.
+    """
+    embeddings = encode_texts([query] + texts)
+    return score_embeddings(embeddings[0], embeddings[1:])
 
 #------------------------------------------------------------------------------#
 
@@ -350,6 +409,147 @@ def text_correlate_texts(request: TextCorrelateTextsRequest) -> TextCorrelateTex
     texts = rank_texts(request.text, request.texts, request.language, request.limit)
 
     return TextCorrelateTextsResponse(texts=texts, took=took(start_time))
+
+#------------------------------------------------------------------------------#
+
+class TextDeduplicateTextsRequest(Request):
+    """
+    A text deduplication request using raw texts.
+
+    Attributes:
+        text (str): the source text to check for duplicates.
+        texts (List[str]): the candidate texts (potential duplicates).
+    """
+    text: str
+    texts: List[str]
+
+class TextDeduplicateScoresResponse(Response):
+    """
+    A text deduplication response with similarity scores.
+
+    Attributes:
+        scores (List[float]): cosine similarity scores, index-aligned with the
+            request candidates.
+    """
+    scores: List[float]
+
+# Endpoint to score potential duplicate texts against a source text.
+@app.post('/text/deduplicate/texts')
+def text_deduplicate_texts(request: TextDeduplicateTextsRequest) -> TextDeduplicateScoresResponse:
+    """
+    API endpoint callback to score potential duplicates against a source text.
+
+    Args:
+        request (TextDeduplicateTextsRequest): the text deduplication request.
+
+    Returns:
+        TextDeduplicateScoresResponse: the text deduplication response.
+    """
+    start_time = time.perf_counter()
+
+    # Validate request.
+    if not request.text:
+        raise HTTPException(status_code=400, detail='Missing text')
+    if not request.texts or len(request.texts) == 0:
+        raise HTTPException(status_code=400, detail='Missing texts')
+
+    # Score each candidate by similarity to the source text (index-aligned).
+    scores = deduplicate_texts(request.text, request.texts)
+
+    return TextDeduplicateScoresResponse(scores=scores, took=took(start_time))
+
+#------------------------------------------------------------------------------#
+
+class TextDeduplicateEmbedRequest(Request):
+    """
+    A request to embed texts with the deduplication model.
+
+    Attributes:
+        texts (List[str]): the texts to embed.
+    """
+    texts: List[str]
+
+class TextDeduplicateEmbedResponse(Response):
+    """
+    A response containing embeddings for the requested texts.
+
+    Attributes:
+        embeddings (List[List[float]]): embedding vectors, index-aligned with
+            the request texts.
+    """
+    embeddings: List[List[float]]
+
+# Endpoint to embed texts for later deduplication.
+@app.post('/text/deduplicate/embed')
+def text_deduplicate_embed(request: TextDeduplicateEmbedRequest) -> TextDeduplicateEmbedResponse:
+    """
+    API endpoint callback to embed texts with the deduplication model.
+
+    Args:
+        request (TextDeduplicateEmbedRequest): the embed request.
+
+    Returns:
+        TextDeduplicateEmbedResponse: the embed response.
+    """
+    start_time = time.perf_counter()
+
+    # Validate request.
+    if not request.texts or len(request.texts) == 0:
+        raise HTTPException(status_code=400, detail='Missing texts')
+
+    embeddings = encode_texts(request.texts).tolist()
+
+    return TextDeduplicateEmbedResponse(embeddings=embeddings, took=took(start_time))
+
+#------------------------------------------------------------------------------#
+
+class TextDeduplicateEmbeddingsRequest(Request):
+    """
+    A text deduplication request using stored embeddings.
+
+    Attributes:
+        embedding (List[float]): the source text embedding.
+        embeddings (List[List[float]]): the candidate embeddings.
+    """
+    embedding: List[float]
+    embeddings: List[List[float]]
+
+# Endpoint to score potential duplicates using stored embeddings.
+@app.post('/text/deduplicate/embeddings')
+def text_deduplicate_embeddings(
+    request: TextDeduplicateEmbeddingsRequest,
+) -> TextDeduplicateScoresResponse:
+    """
+    API endpoint callback to score potential duplicates from embeddings.
+
+    Args:
+        request (TextDeduplicateEmbeddingsRequest): the embeddings request.
+
+    Returns:
+        TextDeduplicateScoresResponse: the text deduplication response.
+    """
+    start_time = time.perf_counter()
+
+    # Validate request.
+    if not request.embedding or len(request.embedding) == 0:
+        raise HTTPException(status_code=400, detail='Missing embedding')
+    if not request.embeddings or len(request.embeddings) == 0:
+        raise HTTPException(status_code=400, detail='Missing embeddings')
+
+    expected_dim = len(request.embedding)
+    for index, candidate in enumerate(request.embeddings):
+        if len(candidate) != expected_dim:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f'Embedding dimension mismatch at index {index}: '
+                    f'expected {expected_dim}, got {len(candidate)}'
+                ),
+            )
+
+    scores = score_embeddings(request.embedding, request.embeddings)
+
+    return TextDeduplicateScoresResponse(scores=scores, took=took(start_time))
 
 #------------------------------------------------------------------------------#
 
