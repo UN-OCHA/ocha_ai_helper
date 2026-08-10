@@ -8,5 +8,5 @@ cd /srv/www/html
 exec s6-setuidgid appuser uvicorn app:app \
   --host ${SERVER_HOST:-0.0.0.0} \
   --port ${SERVER_PORT:-8000} \
-  --log-config=log_config.yaml \
+  --log-config=ecs_log_config.yaml \
   --reload
