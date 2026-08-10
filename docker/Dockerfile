@@ -7,7 +7,7 @@ ENV S6VERSION=2.2.0.3
 COPY . /srv/www
 
 # Fetch s6 init files, needed later.
-RUN apt-get clean && apt-get update && apt-get -y install ca-certificates curl && \
+RUN apt-get clean && apt-get update && apt-get -y install bash ca-certificates curl && \
     S6ARCH=$(uname -m | sed 's/x86_64/amd64/') && \
     echo "Installing s6 version: $S6VERSION for $S6ARCH" && \
     curl -o /tmp/s6-overlay.tar.gz -jkSL https://github.com/just-containers/s6-overlay/releases/download/v${S6VERSION}/s6-overlay-${S6ARCH}.tar.gz
