@@ -7,7 +7,7 @@ ENV S6VERSION=2.2.0.3
 COPY . /srv/www
 
 # Fetch s6 init files, needed later.
-RUN apt-get clean && apt-get update && apt-get -y install bash ca-certificates curl && \
+RUN apt-get clean && apt-get update && apt-get -y install ca-certificates curl && \
     S6ARCH=$(uname -m | sed 's/x86_64/amd64/') && \
     echo "Installing s6 version: $S6VERSION for $S6ARCH" && \
     curl -o /tmp/s6-overlay.tar.gz -jkSL https://github.com/just-containers/s6-overlay/releases/download/v${S6VERSION}/s6-overlay-${S6ARCH}.tar.gz
@@ -32,7 +32,8 @@ ENV GIT_BLAME=$GITHUB_ACTOR \
     GIT_REPO=$GITHUB_REPOSITORY \
     GIT_SHA=$GITHUB_SHA \
     GIT_REF=$GITHUB_REF \
-    GIT_MESSAGE=$GITHUB_MESSAGE
+    GIT_MESSAGE=$GITHUB_MESSAGE \
+    HF_TOKEN=$HF_TOKEN
 
 LABEL info.humanitarianresponse.build.date=$BUILD_DATE \
       info.humanitarianresponse.build.vcs-url=$VCS_URL \
@@ -46,14 +47,18 @@ COPY --from=builder /tmp/s6-overlay.tar.gz /tmp/
 COPY --from=builder /srv/www/docker/etc/services/run_uvicorn /tmp/
 
 # Set environment variables to use the virtual environment.
-ENV PATH=/opt/venv/bin:$PATH
+ENV PATH=/opt/venv/bin:$PATH \
+    HF_TOKEN=$HF_TOKEN
 
 RUN \
     apt-get clean && apt-get update && apt-get -y install curl netcat-openbsd procps && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    # Ensure we install to /usr because /bin and /usr/bin are now both /usr/bin.
-    tar xzf /tmp/s6-overlay.tar.gz -C /usr && \
+    tar vxzf /tmp/s6-overlay.tar.gz -C / && \
     rm -f /tmp/s6-overlay.tar.gz && \
+    # Ensure we move S6 to /usr because /bin and /usr/bin are now both /usr/bin.
+    mv -f /bin/* /usr/bin/ && \
+    rm -rf /bin && \
+    ln -s /usr/bin /bin && \
     # Add some users.
     addgroup --system --gid 4000 appuser && \
     adduser --system --uid 4000 --gid 4000 --shell /sbin/nologin --comment 'Docker App User' --home /home/appuser --no-create-home appuser && \
