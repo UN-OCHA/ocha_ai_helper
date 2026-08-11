@@ -32,8 +32,7 @@ ENV GIT_BLAME=$GITHUB_ACTOR \
     GIT_REPO=$GITHUB_REPOSITORY \
     GIT_SHA=$GITHUB_SHA \
     GIT_REF=$GITHUB_REF \
-    GIT_MESSAGE=$GITHUB_MESSAGE \
-    HF_TOKEN=$HF_TOKEN
+    GIT_MESSAGE=$GITHUB_MESSAGE
 
 LABEL info.humanitarianresponse.build.date=$BUILD_DATE \
       info.humanitarianresponse.build.vcs-url=$VCS_URL \
@@ -47,13 +46,12 @@ COPY --from=builder /tmp/s6-overlay.tar.gz /tmp/
 COPY --from=builder /srv/www/docker/etc/services/run_uvicorn /tmp/
 
 # Set environment variables to use the virtual environment.
-ENV PATH=/opt/venv/bin:$PATH \
-    HF_TOKEN=$HF_TOKEN
+ENV PATH=/opt/venv/bin:$PATH
 
 RUN \
     apt-get clean && apt-get update && apt-get -y install curl netcat-openbsd procps && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    tar vxzf /tmp/s6-overlay.tar.gz -C / && \
+    tar xzf /tmp/s6-overlay.tar.gz -C / && \
     rm -f /tmp/s6-overlay.tar.gz && \
     # Ensure we move S6 to /usr because /bin and /usr/bin are now both /usr/bin.
     mv -f /bin/* /usr/bin/ && \
