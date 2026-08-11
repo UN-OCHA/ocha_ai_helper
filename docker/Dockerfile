@@ -49,9 +49,10 @@ COPY --from=builder /srv/www/docker/etc/services/run_uvicorn /tmp/
 ENV PATH=/opt/venv/bin:$PATH
 
 RUN \
-    apt-get clean && apt-get update && apt-get -y install netcat-openbsd procps && \
+    apt-get clean && apt-get update && apt-get -y install curl netcat-openbsd procps && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    tar xzf /tmp/s6-overlay.tar.gz -C / && \
+    # Ensure we install to /usr because /bin and /usr/bin are now both /usr/bin.
+    tar xzf /tmp/s6-overlay.tar.gz -C /usr && \
     rm -f /tmp/s6-overlay.tar.gz && \
     # Add some users.
     addgroup --system --gid 4000 appuser && \
