@@ -1,7 +1,7 @@
 """
-Pytest configuration and fixtures. Mocks spacy, flashrank, and model2vec so
-tests run without loading real language models. When API_BASE_URL is set, tests
-run against that live API instead (e.g. a running container).
+Pytest configuration and fixtures. Mocks model2vec so tests run without
+loading the real embedding model. When API_BASE_URL is set, tests run against
+that live API instead (e.g. a running container).
 """
 import os
 import sys
@@ -14,38 +14,6 @@ import pytest
 if os.environ.get("API_BASE_URL"):
     _app = None
 else:
-    def _make_mock_doc(sents_texts=None, token_texts=None):
-        """Build a mock spacy-like document with .sents and token iteration."""
-        doc = MagicMock()
-        if sents_texts is None:
-            sents_texts = ["First sentence.", "Second sentence.", "Third sentence."]
-        doc.sents = [MagicMock(text=s) for s in sents_texts]
-        if token_texts is None:
-            token_texts = ["hello", "world", ",", "this", "is", "a", "wide", "test"]
-        tokens = []
-        for t in token_texts:
-            tok = MagicMock()
-            tok.text = t
-            tok.is_space = False
-            tok.is_stop = False
-            tok.is_punct = False
-            tokens.append(tok)
-        doc.__iter__ = lambda self: iter(tokens)
-        return doc
-
-    def _make_mock_nlp():
-        return MagicMock(side_effect=lambda text: _make_mock_doc())
-
-    def _make_mock_ranker():
-        ranker = MagicMock()
-        ranker.rerank = MagicMock(
-            return_value=[
-                {"text": "most relevant", "score": 0.95},
-                {"text": "second", "score": 0.8},
-            ]
-        )
-        return ranker
-
     def _make_mock_dedup_model():
         """
         Return a StaticModel mock whose encode() yields deterministic vectors.
@@ -71,11 +39,6 @@ else:
         model.encode = MagicMock(side_effect=_encode)
         return model
 
-    _mock_spacy = MagicMock()
-    _mock_spacy.load = MagicMock(return_value=_make_mock_nlp())
-    _mock_flashrank = MagicMock()
-    _mock_flashrank.Ranker = MagicMock(return_value=_make_mock_ranker())
-    _mock_flashrank.RerankRequest = MagicMock()
     _mock_model2vec = MagicMock()
     _mock_model2vec.StaticModel.from_pretrained = MagicMock(
         return_value=_make_mock_dedup_model()
@@ -84,8 +47,6 @@ else:
     with patch.dict(
         sys.modules,
         {
-            "spacy": _mock_spacy,
-            "flashrank": _mock_flashrank,
             "model2vec": _mock_model2vec,
         },
     ):
