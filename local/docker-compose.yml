@@ -5,9 +5,6 @@ networks:
     name: ${PROXY:-proxy}
     external: TRUE
 
-volumes:
-  site-models:
-
 services:
   ocha_ai_helper:
     image: public.ecr.aws/unocha/$IMAGE_NAME:$IMAGE_TAG
@@ -20,7 +17,6 @@ services:
       VIRTUAL_NETWORK: ${PROXY:-proxy}
       HTTPS_METHOD: noredirect
     volumes:
-      - "site-models:/opt/models:rw"
       - "../html:/srv/www/html"
     labels:
       caddy: ${SITE_DOMAIN}
