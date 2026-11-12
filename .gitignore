@@ -7,3 +7,6 @@ buildlog.txt
 # Python cache.
 /html/__pycache__
 /tests/__pycache__
+
+# ONNX Runtime local cache (created when running visual classify).
+/html/.cache/

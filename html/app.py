@@ -1,16 +1,30 @@
 """
 OCHA AI Helper HTTP API: focused ML endpoints for OCHA sites.
 """
+import base64
+import os
 import time
-from typing import List
+from io import BytesIO
+from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException
 from model2vec import StaticModel
 import numpy as np
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
+
+try:
+    from visual_classifier import load_session, predict as visual_predict
+except ImportError:  # pragma: no cover - package import used by pytest
+    from html.visual_classifier import load_session, predict as visual_predict
 
 # Deduplication model: multilingual static embeddings, CPU-friendly.
 dedup_model = StaticModel.from_pretrained('/opt/model2vec/potion-multilingual-128M')
+
+# Visual classifier: CPU-only ONNX session (hard-fail if model missing).
+visual_session = load_session(
+    os.environ.get('VISUAL_MODEL_PATH', '/opt/visual/model.onnx')
+)
 
 #------------------------------------------------------------------------------#
 
@@ -129,3 +143,64 @@ def text_deduplicate_embed(request: TextDeduplicateEmbedRequest) -> TextDeduplic
     embeddings = encode_texts(request.texts).tolist()
 
     return TextDeduplicateEmbedResponse(embeddings=embeddings, took=took(start_time))
+
+#------------------------------------------------------------------------------#
+
+class VisualClassifyRequest(BaseModel):
+    """
+    A visual classification request.
+
+    Attributes:
+        image_base64 (str): raw or data-URL base64 of a JPEG/PNG/WebP image.
+    """
+    image_base64: str
+
+
+class VisualClassifyResponse(Response):
+    """
+    A visual classification response.
+
+    Attributes:
+        label (str): predicted class name (Map, Infographic, or Other).
+        probabilities (Dict[str, float]): per-class probabilities.
+    """
+    label: str
+    probabilities: Dict[str, float]
+
+
+@app.post('/visual/classify')
+def visual_classify(request: VisualClassifyRequest) -> VisualClassifyResponse:
+    """
+    Classify an image as Map, Infographic, or Other.
+
+    Args:
+        request (VisualClassifyRequest): request with image_base64.
+
+    Returns:
+        VisualClassifyResponse: label, probabilities, and took.
+    """
+    start_time = time.perf_counter()
+
+    if not request.image_base64:
+        raise HTTPException(status_code=400, detail='Missing image_base64')
+
+    payload = request.image_base64
+    if ',' in payload and payload.lstrip().startswith('data:'):
+        payload = payload.split(',', 1)[1]
+
+    try:
+        image_bytes = base64.b64decode(payload, validate=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Invalid image_base64') from exc
+
+    try:
+        image = Image.open(BytesIO(image_bytes)).convert('RGB')
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail='Invalid image') from exc
+
+    result = visual_predict(visual_session, image)
+    return VisualClassifyResponse(
+        label=result['label'],
+        probabilities=result['probabilities'],
+        took=took(start_time),
+    )

@@ -38,6 +38,26 @@ Response:
 
 Embeddings are index-aligned with the request `texts`.
 
+## Visual classify
+
+`POST /visual/classify` classifies an image as `Map`, `Infographic`, or `Other` using a CPU-only ONNX model. The helper does **not** fetch remote URLs — send image bytes as base64 (raw or data-URL).
+
+Request:
+
+```json
+{ "image_base64": "<raw or data-URL base64 of JPEG/PNG/WebP>" }
+```
+
+Response:
+
+```json
+{
+  "label": "Map",
+  "probabilities": { "Map": 0.92, "Infographic": 0.07, "Other": 0.01 },
+  "took": 0.012
+}
+```
+
 ## Run locally
 
 See [local/README.md](local/README.md).
